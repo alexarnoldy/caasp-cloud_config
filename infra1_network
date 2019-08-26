@@ -1,0 +1,31 @@
+admin@infra1:~> ip a
+
+2: eth0: <BROADCAST,MULTICAST,SLAVE,UP,LOWER_UP> mtu 1500 qdisc mq master bond0 state UP group default qlen 1000
+    link/ether 3c:4a:92:dd:87:a8 brd ff:ff:ff:ff:ff:ff
+3: eth1: <BROADCAST,MULTICAST,SLAVE,UP,LOWER_UP> mtu 1500 qdisc mq master bond0 state UP group default qlen 1000
+    link/ether 3c:4a:92:dd:87:a8 brd ff:ff:ff:ff:ff:ff
+4: bond0: <BROADCAST,MULTICAST,MASTER,UP,LOWER_UP> mtu 1500 qdisc noqueue master br241 state UP group default qlen 1000
+
+NOTE: VLAN241 is private and used as the SOC admin network so PXE can run untagged
+NOTE: It may be possible to have the node use untagged on the routed VLAN (240) and the admin VLAN (241) be presented untagged to the VMs
+
+5: br241: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    inet 172.16.241.101/24 brd 172.16.241.255 scope global br241
+
+NOTE: VLANs are run on top of the bridge, not the bond so tagged and non-tagged traffic gets passed up to the VMs
+NOTE: On the VMs, use a single interface that connects to: "Specify shared device" -> br241
+
+NOTE: VLAN200 is storage
+6: vlan200@br241: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    inet 172.16.200.101/24 brd 172.16.200.255 scope global vlan200
+
+NOTE: VLAN240 is public and routed
+7: vlan240@br241: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    inet 172.16.240.101/24 brd 172.16.240.255 scope global vlan240
+
+NOTE: VLAN242 is SDN, VLAN243 is Nova Fixed
+8: vlan242@br241: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 3c:4a:92:dd:87:a8 brd ff:ff:ff:ff:ff:ff
+9: vlan243@br241: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 3c:4a:92:dd:87:a8 brd ff:ff:ff:ff:ff:ff
+
