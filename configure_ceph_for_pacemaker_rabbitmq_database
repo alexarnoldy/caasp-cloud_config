@@ -1,0 +1,185 @@
+
+Instructions in the deployment guide for enabling HA Pool adn Update repos is incorrect. Should be: for REPO in SLE-HA12-SP4-{Pool,Updates}; do   smt-repos $REPO sle-12-x86_64 -e; done
+
+G.     Configure public and storage networks on all controllers:
+
+a.       crowbarctl node list
+
+                                                               i.      To get the FQDNs of the controllers
+
+b.      Use the follow loop to allocate networks:                           for EACH in  `cat  .controllerFQDNs` ; do crowbar network allocate_ip "default" $EACH "public" "host"; crowbar network allocate_ip "default" $EACH "storage" "host"; done
+
+c.       Run chef-client on Admin node:                         chef-client
+
+d.      Run chef-client on controllers:                             pssh -h .controllerFQDNs -i  chef-client
+
+H.      Verify through GUI that node has public and storage networks configured on bonded interfaces
+
+I.        (If needed), update password on each HA server
+
+Install ceph-common on each controller: zypper -n in ceph-common
+Copy ceph.conf and admin key on each controller: scp 172.16.200.130:/etc/ceph/ceph.client.admin.keyring /etc/ceph/; scp 172.16.200.130:/etc/ceph/ceph.conf /etc/ceph/
+////
+J.        Log into monitor node:                  
+a.       Install ceph-deploy on the monitor:            zypper --non-interactive install   ceph-deploy 
+
+b.      Install Ceph on the controllers:            ceph-deploy   install   controller-1 controller-2 controller-3
+
+c.       Push the admin keyring and ceph.conf to the controllers:            cd /etc/ceph; ceph-deploy admin    controller-1 controller-2 controller-3
+////
+
+K.      Log into the first controller:
+
+a.       Verify the controller has access to the Ceph cluster:      ceph -s
+
+b.      Create the HA pool:                                                  ceph osd pool create caasp-cloud 128 128
+
+c.       Create the Pacemaker SBD device:                    rbd create  caasp-cloud/hadevice  --image-shared  --size 52224
+
+d.      Create the database storage:                               rbd create caasp-cloud/hapostrges --image-shared  --size 102400              
+
+e.      Create the RabbitMQ storage:                             rbd create caasp-cloud/harabbitmq --image-shared  --size 102400
+
+L.       From the Admin node:
+
+a.       Set up the rbdmap on the controllers:              pssh  -h .controllers -i 'echo "caasp-cloud/hadevice         id=admin,keyring=/etc/ceph/ceph.client.admin.keyring"  >> /etc/ceph/rbdmap'
+
+b.      Set up the rbdmap on the controllers:              pssh  -h .controllers -i 'echo "caasp-cloud/hapostrges     id=admin,keyring=/etc/ceph/ceph.client.admin.keyring"  >> /etc/ceph/rbdmap'
+
+c.       Set up the rbdmap on the controllers:              pssh  -h .controllers -i 'echo "caasp-cloud/harabbitmq    id=admin,keyring=/etc/ceph/ceph.client.admin.keyring"  >> /etc/ceph/rbdmap'
+
+d.      Enable the RBD map service:                                pssh  -h .controllers -i   systemctl enable rbdmap.service
+
+e.      Install SBD service:                                                    pssh  -h .controllers -i   zypper --non-interactive install sbd
+
+f.        Reboot the controllers:                                           pssh  -h .controllers -i   reboot
+
+g.       After the controllers have rebooted, verify each node has the correct number of rbd devices mapped:
+
+                                                               i.      Use the command:                                   pssh  -h .controllers -i   'lsblk | grep rbd'
+
+M.    Log into the first controller:
+
+a.       Verify the controller has access to the Ceph cluster:      ceph -s
+
+b.      Set up the SBD:                                                           sbd -d /dev/rbd/caasp-cloud/hadevice   create
+
+c.       Create a filesystem on the database storage:                    mkfs.ext4 /dev/rbd/caasp-cloud/hapostrges
+
+d.      Create a filesystem on the RabbitMQ storage:                  mkfs.ext4 /dev/rbd/caasp-cloud/harabbitmq
+
+N.     Use the Crowbar GUI to deploy the HA controllers:
+
+a.       Change the name from “proposal_1” to:                             control
+
+b.      Start by dragging all controllers into “pacemaker-cluster-member” field
+
+c.       Set “Configuration mode for STONITH” to SBD
+
+d.      Set “Kernel module for watchdog” to:                                 softdog
+
+e.      Set “Block devices for node” for each node to:                 /dev/rbd/caasp-cloud/hadevice
+
+O.     Deploy the Database service:
+
+a.       Remove any nodes from the “database-server” field and add the control cluster
+
+b.      Set “Name of Block Device” to:                                                /dev/rbd/caasp-cloud/hapostrges
+
+c.       Set “Filesystem Type” to:                                                           ext4
+
+P.      Deploy the RabbitMQ service:
+
+a.       Remove any nodes from the “rabbitmq-server” field and add the control cluster
+
+b.      Set “Name of Block Device” to:                                                /dev/rbd/caasp-cloud/harabbitmq
+
+c.       Set “Filesystem Type” to:                                                           ext4
+
+Q.     Deploy Keystone:
+
+a.       Remove any nodes from the “keystone-server” field and add the control cluster
+
+R.      Deploy Glance:
+
+a.       Change “Default Storage Store” to Rados
+
+b.      Remove any nodes from the “glance-server” field and add the control cluster
+
+S.       Deploy Cinder:
+
+a.       Click the trash can icon to the right of “Backend: default”
+
+b.      Under “Type of Volume” select RADOS and click “Add Backend”
+
+c.       Remove any nodes from the “cinder-controller” and “cinder-volume” fields and add the OpenStack cluster
+
+T.       Prepare Neutron-network cluster:
+
+a.       Allocate neutron-network cluster nodes
+
+b.      On Admin node, create a file called .neutron-network-nodes containing all of the FQDNs or aliases of the neutron cluster controllers, one per line
+
+c.       Configure public and storage networks on all neutron controllers:
+
+                                                               i.      crowbarctl node list
+
+1.  To get the FQDNs of the neutron controllers
+
+                                                             ii.       for EACH in  <FQDN of 1st neutron controller>  <FQDN of 2nd neutron controller>  <FQDN of 3rd neutron controller> ; do crowbar network allocate_ip "default" $EACH "public" "host"; crowbar network allocate_ip "default" $EACH "storage" "host"; done
+
+                                                            iii.      Run chef-client on Admin node:                              chef-client
+
+                                                           iv.      Run chef-client on controllers:                                 pssh –h . neutron-network-nodes -i  chef-client
+
+d.      Verify through GUI that node has public and storage networks configured on bonded interfaces
+
+U.     Log into monitor node:  
+
+a.       Install Ceph on the neutron controllers:            ceph-deploy   install   <1st neutron controller> <2nd neutron controller> <3rd neutron controller>
+
+b.      Push the admin keyring and ceph.conf to the neutron controllers:            cd /etc/ceph; ceph-deploy    admin    <1st neutron controller> <2nd neutron controller> <3rd neutron controller>
+
+V.      Log into the first neutron controller:
+
+a.       Verify the neutron controller has access to the Ceph cluster:         ceph -s
+
+b.      Create the Neutron network SBD device:       rbd create  caasp-cloud/haneutron-network  --image-shared  --size 52224
+
+W.    From the Admin node:
+
+a.       Set up the rbdmap on the neutron controllers:                pssh  -h .neutron-network-nodes -i 'echo "caasp-cloud/haneutron-network         id=admin,keyring=/etc/ceph/ceph.client.admin.keyring"  >> /etc/ceph/rbdmap'
+
+b.      Enable the RBD map service:                                                    pssh  -h .neutron-network-nodes -i   systemctl enable rbdmap.service
+
+c.       Install SBD service:                                                                        pssh  -h .neutron-network-nodes -i   zypper --non-interactive install sbd
+
+d.      Reboot the controllers:                                                               pssh  -h .neutron-network-nodes -i   reboot
+
+X.      Log into the first neutron controller:
+
+a.       Verify the controller has access to the Ceph cluster:      ceph -s
+
+b.      Set up the SBD:                                                                               sbd -d /dev/rbd0 create
+
+Y.       Use the Crowbar GUI to deploy the HA Neutron controllers:
+
+a.       Change the name from “proposal_1” to:                             HANeutron
+
+b.      Start by dragging all neutron controllers into “pacemaker-cluster-member” field
+
+c.       Set “Configuration mode for STONITH” to SBD
+
+d.      Set “Kernel module for watchdog” to:                                 softdog
+
+e.      Set “Block devices for node” for each node to:                 /dev/rbd0
+
+Z.       Deploy Neutron:
+
+a.       Remove any nodes from the “neutron-server” field and add the OpenStack cluster
+
+b.      Remove any nodes from the “neutron-network” field and add the HA Neutron cluster
+
+c.        
+
+ 
