@@ -1,6 +1,14 @@
 
 Instructions in the deployment guide for enabling HA Pool adn Update repos is incorrect. Should be: for REPO in SLE-HA12-SP4-{Pool,Updates}; do   smt-repos $REPO sle-12-x86_64 -e; done
 
+When accessing the webserver on the admin node, it might be easier to use an ssh tunnel through a node that is also on the admin network, like
+one of the infrastructure hosts (cc1, in this case): ssh -L 8080:172.16.241.10:80 -L 8443:172.16.241.10:443 cc1 -N
+
+* Then just browse from the local system to http://localhost:8080 or https://localhost:8443
+** sshuttle should also work but had trouble getting it to work at all from my Leap VM
+
+Just noticed in the Crowbar install page that if you want to re-install, first remove /var/lib/crowbar/install/crowbar-installed-ok
+
 G.     Configure public and storage networks on all controllers:
 
 a.       crowbarctl node list
@@ -32,7 +40,7 @@ K.      Log into the first controller:
 
 a.       Verify the controller has access to the Ceph cluster:      ceph -s
 
-b.      Create the HA pool:                                                  ceph osd pool create caasp-cloud 128 128
+b.      Create the HA pool:                                                  ceph osd pool create caasp-cloud 16 16
 
 c.       Create the Pacemaker SBD device:                    rbd create  caasp-cloud/hadevice  --image-shared  --size 52224
 
