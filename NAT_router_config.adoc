@@ -1,0 +1,48 @@
+==== In this example eth0 is the external interface and eth1 is the internal interface
+
+ip a
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    inet 172.16.100.254/24 brd 172.16.241.255 scope global eth0
+3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    inet 172.16.101.254/24 brd 172.16.240.255 scope global vlan240
+
+==== NAT router setup:
+
+.Steps:
+* `zypper install yast2-network`
+* `zypper install yast2-firewall`
+* `sudo yast routing ip-forwarding on`
+* `sudo yast firewall`
+** Under the `Start-Up` option, make sure the firewall reload upon writing the configuration and starts on reboot
+** Under the `Interfaces` option, put the internal and external interfaces in their respective zones
+** Under the `Zones` option, set the external zone as default
+
+
+NOTE: Sometimes it seems to need a reboot to get it to forward correctly
+
+* Verify masquerade is set correctly:
+* `sudo firewall-cmd --list-all --zone=external`
+** Should show a minimum of:
+----
+external (active)
+  interfaces: eth0
+  services: ssh
+  masquerade: yes
+----
+
+* Execute the following command if `masquerade` is not set to `yes`: `sudo firewall-cmd --zone=external --add-masquerade`
+
+* `sudo firewall-cmd --list-all --zone=internal`
+** Should show a minimum of:
+----
+internal (active)
+  interfaces: eth1
+  services: ssh mdns samba-client dhcpv6-client
+  masquerade: no
+----
+
+
+
+
+
+// vim: set syntax=asciidoc:
