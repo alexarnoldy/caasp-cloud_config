@@ -10,8 +10,8 @@ ip a
 ==== NAT router setup:
 
 .Steps:
-* `zypper install yast2-network`
-* `zypper install yast2-firewall`
+* `sudo zypper install yast2-network`
+* `sudo zypper install yast2-firewall`
 * `sudo yast routing ip-forwarding on`
 * `sudo yast firewall`
 ** Under the `Start-Up` option, make sure the firewall reload upon writing the configuration and starts on reboot
